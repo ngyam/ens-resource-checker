@@ -1,0 +1,41 @@
+{
+  "name": "ewc-balance-viewer",
+  "version": "1.0.0",
+  "description": "ENS name resource checker",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "build:prod": "webpack",
+    "start:dev": "webpack-dev-server --output-public-path=/dist/ -d --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngyam/ens-resource-checker.git"
+  },
+  "author": "Adam Nagy <ngy.am.zs@gmail.com>",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/ngyam/ens-resource-checker/issues"
+  },
+  "homepage": "https://github.com/ngyam/ens-resource-checker#readme",
+  "dependencies": {
+    "@ensdomains/address-encoder": "^0.1.6",
+    "content-hash": "^2.5.2",
+    "eth-ens-namehash": "^2.0.8",
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6",
+    "web3": "^1.2.2"
+  },
+  "devDependencies": {
+    "@types/react": "^16.8.15",
+    "@types/react-dom": "^16.8.4",
+    "@types/web3": "^1.2.2",
+    "awesome-typescript-loader": "^5.2.1",
+    "source-map-loader": "^0.2.4",
+    "typescript": "^3.8.3",
+    "webpack": "^4.30.0",
+    "webpack-cli": "^3.3.1",
+    "webpack-dev-server": "^3.3.1"
+  }
+}
