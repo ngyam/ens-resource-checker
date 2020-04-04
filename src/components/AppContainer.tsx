@@ -1,8 +1,11 @@
 import * as React from 'react';
 const Web3 = require('web3');
+const namehash = require('eth-ens-namehash');
 import { ENSCheck } from './ENSCheck';
 import { ENSSend } from './ENSSend';
+import { ENSBasics } from './ENSBasics';
 import { NETWORKS } from '../Settings';
+import { debounce } from '../utils'
 
 import {
     REGISTRY_ABI,
@@ -17,7 +20,10 @@ interface AppContainerState {
     baseContract: any
     controllerContract:any
     chainID: number
-    ensName: string
+    ensName: string,
+    tokenID: string,
+    ensHash: string,
+    isAddress : boolean
 }
 
 export class AppContainer extends React.Component<{}, AppContainerState> {
@@ -30,7 +36,10 @@ export class AppContainer extends React.Component<{}, AppContainerState> {
             controllerContract: null,
             baseContract: null,
             chainID: null,
-            ensName: null
+            ensName: null,
+            ensHash: null,
+            tokenID: null,
+            isAddress: false
         }
 
         this.onNameChange = this.onNameChange.bind(this);
@@ -64,19 +73,31 @@ export class AppContainer extends React.Component<{}, AppContainerState> {
         //await this.fillWithFirstENSName();
     }
 
-    async fillWithFirstENSName() {
-       this.setState({ ensName: 'alice.ewc' });
+    onNameChange(ensName: string) {
+        console.log("name changed")
+        const { web3 } = this.state
+        const ensHash = namehash.hash(ensName)
+        const namefragments = ensName.split('.')
+        const tokenID = web3.utils.hexToNumberString(web3.utils.soliditySha3(namefragments.length > 1 ? namefragments.slice(0,-1).join('.') : ensName))
+        const isAddress = web3.utils.isAddress(ensName)
+        this.setState({
+            ensName,
+            ensHash,
+            tokenID,
+            isAddress
+        });
     }
 
-
-    async onNameChange(event: any) {
-        event.persist();
-        this.setState({ ensName: event.target.value });
+    async onTyping(event: any, f: any) {
+        event.persist()
+        console.log("ontyping", event.target.value)
+        f(event.target.value)
     }
 
     render() {
-        const { chainID } = this.state;
+        const { chainID, isAddress, registryContract, baseContract, controllerContract, ensName, ensHash, tokenID, web3 } = this.state;
         const isValidNetwork = Object.keys(NETWORKS).includes(chainID?.toString());
+        const f = debounce(this.onNameChange, 500)
         return <div className='container'>
             <h1 className='text-center text-muted space'>ENS name resource checker</h1>
             {isValidNetwork &&
@@ -95,22 +116,33 @@ export class AppContainer extends React.Component<{}, AppContainerState> {
                                     type='text'
                                     className='form-control text-center'
                                     placeholder='type ENS name to look up, e.g. alice.ewc'
-                                    onChange={this.onNameChange}
-                                    defaultValue={this.state.ensName}
+                                    onChange={(e) => this.onTyping(e, f)}
+                                    defaultValue={ensName}
                                 />
                             </div>
                         </div>
                     <ENSSend
-                        web3={this.state.web3}
-                        registryContract={this.state.registryContract}
-                        ensName={this.state.ensName}
+                        web3={web3}
+                        registryContract={registryContract}
+                        ensName={ensName}
+                        ensHash={ensHash}
+                        isAddress={isAddress}
+                    />
+                    <ENSBasics
+                        ensName={ensName}
+                        ensHash={ensHash}
+                        tokenID={tokenID}
+                        isAddress={isAddress}
                     />
                     <ENSCheck
-                        web3={this.state.web3}
-                        registryContract={this.state.registryContract}
-                        baseContract={this.state.baseContract}
-                        controllerContract={this.state.controllerContract}
-                        ensName={this.state.ensName}
+                        web3={web3}
+                        registryContract={registryContract}
+                        baseContract={baseContract}
+                        controllerContract={controllerContract}
+                        ensName={ensName}
+                        ensHash={ensHash}
+                        tokenID={tokenID}
+                        isAddress={isAddress}
                     />
                 </>
             }

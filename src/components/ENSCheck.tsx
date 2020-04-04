@@ -1,7 +1,7 @@
 import * as React from 'react';
 import Web3 = require('web3');
 const contentHash = require('content-hash');
-const namehash = require('eth-ens-namehash');
+import Loader from 'react-loader-spinner'
 //import { formatsByCoinType } from '@ensdomains/address-encoder';
 import {
     coinMap,
@@ -13,7 +13,6 @@ import {
 } from '../Settings';
 
 import {RESOLVER_PUBLIC_ABI} from '../abi/Ens'
-
 interface StringToString {
     [key: string]: string
 }
@@ -22,14 +21,15 @@ interface ENSProps {
     web3: any
     registryContract: any
     baseContract: any
-    controllerContract:any
-    ensName: string
+    controllerContract: any
+    ensName: string,
+    ensHash: string,
+    tokenID: string,
+    isAddress: boolean
 }
 
 interface ENSState {
-    ensHash: string
-    tokenID: string
-    isAddress: boolean
+    ready: boolean,
     exists: boolean
     hasResolver: boolean
     owner: string
@@ -48,11 +48,9 @@ interface ENSState {
 export class ENSCheck extends React.Component<ENSProps, ENSState> {
 
     constructor(props: any) {
-        super(props);
+        super(props)
         this.state = {
-            ensHash: null,
-            tokenID: null,
-            isAddress: false,
+            ready: false,
             exists: false,
             hasResolver: false,
             owner: null,
@@ -70,49 +68,44 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
     }
 
     componentDidUpdate(prevProps: ENSProps) {
-        if (this.props.ensName && this.props.ensName !== prevProps.ensName) {
+        if (this.props.ensName !== prevProps.ensName) {
+            this.setState({ready: false})
             this.getNameData()
         }
     }
 
     async componentDidMount() {
-        if (this.props.ensName) {
-            await this.getNameData()
-        }
+        this.setState({ready: false})
+        await this.getNameData()
     }
 
     shouldComponentUpdate(nextProps: ENSProps, nextState: ENSState) {
-
         return true
     }
 
     async getNameData() {
-
-        const { web3, ensName, registryContract, baseContract } = this.props;
+        const { web3, isAddress, ensName, ensHash, tokenID, registryContract, baseContract } = this.props;
 
         if (!ensName) {
+            this.setState({
+                ready: true
+            })
             return
         }
 
-        if(web3.utils.isAddress(ensName)) {
+        if(isAddress) {
             this.setState ({
-                ensHash: null,
-                isAddress: true,
+                ready: true,
                 exists: false,
                 hasResolver: false,
             })
             return
         }
-        const ensHash = namehash.hash(ensName)
-        const namefragments = ensName.split('.')
-        const tokenID = web3.utils.hexToNumberString(web3.utils.soliditySha3(namefragments.length > 1 ? namefragments.slice(0,-1).join('.') : ensName))
         const exists = await registryContract.methods.recordExists(ensHash).call()
         const owner = await registryContract.methods.owner(ensHash).call()
         if (!exists || owner === ZERO_ADDRESS) {
             this.setState ({
-                ensHash: ensHash,
-                tokenID: tokenID,
-                isAddress: false,
+                ready: true,
                 exists: false,
                 hasResolver: false,
             })
@@ -122,9 +115,7 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
         const resolverAddr = await registryContract.methods.resolver(ensHash).call()
         if (!resolverAddr || resolverAddr === ZERO_ADDRESS) {
             this.setState ({
-                ensHash: ensHash,
-                tokenID: tokenID,
-                isAddress: false,
+                ready: true,
                 exists: true,
                 hasResolver: false,
                 owner: owner,
@@ -132,7 +123,6 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
             })
             return
         }
-        console.log("yo")
         const resolverContract = await new web3.eth.Contract(RESOLVER_PUBLIC_ABI as any, resolverAddr)
 
         let controllers = await resolverContract.getPastEvents('AuthorisationChanged', {
@@ -149,7 +139,6 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
 
         const addr = await resolverContract.methods.addr(ensHash).call()
         const pubkeyFragments = await resolverContract.methods.pubkey(ensHash).call()
-        console.log(pubkeyFragments, pubkeyFragments.x === ZERO_BYTES && pubkeyFragments.y === ZERO_BYTES)
         const pubkey = pubkeyFragments.x === ZERO_BYTES && pubkeyFragments.y === ZERO_BYTES ? null: [pubkeyFragments.x, pubkeyFragments.y]
         
         const contentres = await resolverContract.methods.contenthash(ensHash).call()
@@ -177,9 +166,7 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
 
         console.log(
             {
-                ensHash: ensHash,
-                tokenID: tokenID,
-                isAddress: false,
+                ready: true,
                 exists: true,
                 hasResolver: true,
                 owner: owner,
@@ -198,9 +185,7 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
 
         //Math.floor(Date.now() / 1000
         this.setState ({
-            ensHash: ensHash,
-            tokenID: tokenID,
-            isAddress: false,
+            ready: true,
             exists: true,
             hasResolver: true,
             owner: owner,
@@ -260,35 +245,10 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
     }
 
     render() {
+        const { isAddress } = this.props;
         const ensregistered = this.state.exists && this.state.owner !== null && this.state.owner !== ZERO_ADDRESS
-        return <div>
-                {this.props.ensName && this.state.ensHash &&
-                    <div className='row space'>
-                        <div className='col-md-4'>
-                            <h2 className='card-title text-right'>
-                                {this.props.ensName}
-                            </h2>
-                        </div>
-                        <div className='col-md-8'>
-                            <div className='card'>
-                                <div className='card-body padding-half'>
-                                    <h5 className='card-title'>
-                                        {this.state.ensHash}
-                                    </h5>
-                                    <h6 className='card-subtitle mb-2 text-muted'>Name hash</h6>
-                                </div>
-                            </div>
-                            <div className='card'>
-                                <div className='card-body padding-half'>
-                                    <h5 className='card-title'>
-                                        {this.state.tokenID}
-                                    </h5>
-                                    <h6 className='card-subtitle mb-2 text-muted'>ERC721 token ID</h6>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                }
+        return this.state.ready ? (
+            <div>
                 {ensregistered &&
                     <div className='row space'>
                         <div className='col-md-4'>
@@ -429,7 +389,7 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
                                         <h5 className='card-title'>
                                         {x}
                                         </h5>
-                                        <h6 className='card-subtitle mb-2 text-muted'>{i === 0 ?'X':'Y'} coordinate</h6>
+                                        <h6 className='card-subtitle mb-2 text-muted'>{i === 0 ? 'X': 'Y'} coordinate</h6>
                                     </div>
                                 </div>
                             )}
@@ -459,12 +419,12 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
                 }
             <div className='row'>
                 <div className='col text-center'>
-                    {this.state.isAddress &&
+                    {isAddress &&
                         <div className='alert alert-warning space' role='alert'>
                             This is a regular Ethereum address. Please enter an ENS name, like 'subdomain.alice.ewc'.
                         </div>  
                     }
-                    {!this.state.isAddress && !ensregistered && this.props.ensName &&
+                    {!isAddress && !ensregistered && this.props.ensName &&
                         <div className='alert alert-warning space' role='alert'>
                             ENS name does not exist yet.
                         </div>  
@@ -481,6 +441,19 @@ export class ENSCheck extends React.Component<ENSProps, ENSState> {
                     }
                 </div>
             </div>
-        </div>
+        </div>) : (
+            <div>
+                <div className='row space'>
+                    <div className='col text-center'>
+                        <Loader
+                            type="BallTriangle"
+                            height={100}
+                            width={100}
+                            color='#007bff'
+                        />
+                    </div>
+                </div>
+            </div>
+        )
     }
 }

@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const React = require("react");
 const contentHash = require('content-hash');
-const namehash = require('eth-ens-namehash');
+const react_loader_spinner_1 = require("react-loader-spinner");
 //import { formatsByCoinType } from '@ensdomains/address-encoder';
 const Settings_1 = require("../Settings");
 const Ens_1 = require("../abi/Ens");
@@ -19,9 +19,7 @@ class ENSCheck extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            ensHash: null,
-            tokenID: null,
-            isAddress: false,
+            ready: false,
             exists: false,
             hasResolver: false,
             owner: null,
@@ -38,15 +36,15 @@ class ENSCheck extends React.Component {
         };
     }
     componentDidUpdate(prevProps) {
-        if (this.props.ensName && this.props.ensName !== prevProps.ensName) {
+        if (this.props.ensName !== prevProps.ensName) {
+            this.setState({ ready: false });
             this.getNameData();
         }
     }
     componentDidMount() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.props.ensName) {
-                yield this.getNameData();
-            }
+            this.setState({ ready: false });
+            yield this.getNameData();
         });
     }
     shouldComponentUpdate(nextProps, nextState) {
@@ -54,29 +52,26 @@ class ENSCheck extends React.Component {
     }
     getNameData() {
         return __awaiter(this, void 0, void 0, function* () {
-            const { web3, ensName, registryContract, baseContract } = this.props;
+            const { web3, isAddress, ensName, ensHash, tokenID, registryContract, baseContract } = this.props;
             if (!ensName) {
+                this.setState({
+                    ready: true
+                });
                 return;
             }
-            if (web3.utils.isAddress(ensName)) {
+            if (isAddress) {
                 this.setState({
-                    ensHash: null,
-                    isAddress: true,
+                    ready: true,
                     exists: false,
                     hasResolver: false,
                 });
                 return;
             }
-            const ensHash = namehash.hash(ensName);
-            const namefragments = ensName.split('.');
-            const tokenID = web3.utils.hexToNumberString(web3.utils.soliditySha3(namefragments.length > 1 ? namefragments.slice(0, -1).join('.') : ensName));
             const exists = yield registryContract.methods.recordExists(ensHash).call();
             const owner = yield registryContract.methods.owner(ensHash).call();
             if (!exists || owner === Settings_1.ZERO_ADDRESS) {
                 this.setState({
-                    ensHash: ensHash,
-                    tokenID: tokenID,
-                    isAddress: false,
+                    ready: true,
                     exists: false,
                     hasResolver: false,
                 });
@@ -86,9 +81,7 @@ class ENSCheck extends React.Component {
             const resolverAddr = yield registryContract.methods.resolver(ensHash).call();
             if (!resolverAddr || resolverAddr === Settings_1.ZERO_ADDRESS) {
                 this.setState({
-                    ensHash: ensHash,
-                    tokenID: tokenID,
-                    isAddress: false,
+                    ready: true,
                     exists: true,
                     hasResolver: false,
                     owner: owner,
@@ -96,7 +89,6 @@ class ENSCheck extends React.Component {
                 });
                 return;
             }
-            console.log("yo");
             const resolverContract = yield new web3.eth.Contract(Ens_1.RESOLVER_PUBLIC_ABI, resolverAddr);
             let controllers = yield resolverContract.getPastEvents('AuthorisationChanged', {
                 filter: { node: ensHash, owner: owner },
@@ -112,7 +104,6 @@ class ENSCheck extends React.Component {
             }
             const addr = yield resolverContract.methods.addr(ensHash).call();
             const pubkeyFragments = yield resolverContract.methods.pubkey(ensHash).call();
-            console.log(pubkeyFragments, pubkeyFragments.x === Settings_1.ZERO_BYTES && pubkeyFragments.y === Settings_1.ZERO_BYTES);
             const pubkey = pubkeyFragments.x === Settings_1.ZERO_BYTES && pubkeyFragments.y === Settings_1.ZERO_BYTES ? null : [pubkeyFragments.x, pubkeyFragments.y];
             const contentres = yield resolverContract.methods.contenthash(ensHash).call();
             const contenthash = contentres ? this.decodeContenthash(contentres) : null;
@@ -134,9 +125,7 @@ class ENSCheck extends React.Component {
                 result[1] ? abi[key] = web3.utils.hexToUtf8(result[1]) : undefined;
             }
             console.log({
-                ensHash: ensHash,
-                tokenID: tokenID,
-                isAddress: false,
+                ready: true,
                 exists: true,
                 hasResolver: true,
                 owner: owner,
@@ -153,9 +142,7 @@ class ENSCheck extends React.Component {
             });
             //Math.floor(Date.now() / 1000
             this.setState({
-                ensHash: ensHash,
-                tokenID: tokenID,
-                isAddress: false,
+                ready: true,
                 exists: true,
                 hasResolver: true,
                 owner: owner,
@@ -214,21 +201,9 @@ class ENSCheck extends React.Component {
     }
     render() {
         var _a;
+        const { isAddress } = this.props;
         const ensregistered = this.state.exists && this.state.owner !== null && this.state.owner !== Settings_1.ZERO_ADDRESS;
-        return React.createElement("div", null,
-            this.props.ensName && this.state.ensHash &&
-                React.createElement("div", { className: 'row space' },
-                    React.createElement("div", { className: 'col-md-4' },
-                        React.createElement("h2", { className: 'card-title text-right' }, this.props.ensName)),
-                    React.createElement("div", { className: 'col-md-8' },
-                        React.createElement("div", { className: 'card' },
-                            React.createElement("div", { className: 'card-body padding-half' },
-                                React.createElement("h5", { className: 'card-title' }, this.state.ensHash),
-                                React.createElement("h6", { className: 'card-subtitle mb-2 text-muted' }, "Name hash"))),
-                        React.createElement("div", { className: 'card' },
-                            React.createElement("div", { className: 'card-body padding-half' },
-                                React.createElement("h5", { className: 'card-title' }, this.state.tokenID),
-                                React.createElement("h6", { className: 'card-subtitle mb-2 text-muted' }, "ERC721 token ID"))))),
+        return this.state.ready ? (React.createElement("div", null,
             ensregistered &&
                 React.createElement("div", { className: 'row space' },
                     React.createElement("div", { className: 'col-md-4' },
@@ -305,14 +280,17 @@ class ENSCheck extends React.Component {
                             React.createElement("h6", { className: 'card-subtitle mb-2 text-muted' }, x[0])))))),
             React.createElement("div", { className: 'row' },
                 React.createElement("div", { className: 'col text-center' },
-                    this.state.isAddress &&
+                    isAddress &&
                         React.createElement("div", { className: 'alert alert-warning space', role: 'alert' }, "This is a regular Ethereum address. Please enter an ENS name, like 'subdomain.alice.ewc'."),
-                    !this.state.isAddress && !ensregistered && this.props.ensName &&
+                    !isAddress && !ensregistered && this.props.ensName &&
                         React.createElement("div", { className: 'alert alert-warning space', role: 'alert' }, "ENS name does not exist yet."),
                     ensregistered && !this.state.hasResolver &&
                         React.createElement("div", { className: 'alert alert-warning space', role: 'alert' }, "ENS name does not have a resolver set."),
                     this.state.errorMsg &&
-                        React.createElement("div", { className: 'alert alert-danger space', role: 'alert' }, this.state.errorMsg))));
+                        React.createElement("div", { className: 'alert alert-danger space', role: 'alert' }, this.state.errorMsg))))) : (React.createElement("div", null,
+            React.createElement("div", { className: 'row space' },
+                React.createElement("div", { className: 'col text-center' },
+                    React.createElement(react_loader_spinner_1.default, { type: "BallTriangle", height: 100, width: 100, color: '#007bff' })))));
     }
 }
 exports.ENSCheck = ENSCheck;

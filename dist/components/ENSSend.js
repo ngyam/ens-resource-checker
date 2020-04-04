@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const React = require("react");
-const namehash = require('eth-ens-namehash');
 const Ens_1 = require("../abi/Ens");
 const Settings_1 = require("../Settings");
 class ENSSend extends React.Component {
@@ -25,27 +24,31 @@ class ENSSend extends React.Component {
         this.onTransferClick = this.onTransferClick.bind(this);
     }
     componentDidUpdate(prevProps) {
+        if (this.props.ensName !== prevProps.ensName) {
+            this.setState({ errorMsg: null });
+        }
     }
     componentDidMount() {
         return __awaiter(this, void 0, void 0, function* () {
+            console.log("send didmount");
         });
     }
     shouldComponentUpdate(nextProps, nextState) {
         const difference = Object.keys(nextState).filter(k => nextState[k] !== this.state[k]);
+        console.log("state diff", difference);
+        const propchange = this.props.ensName !== nextProps.ensName;
+        console.log("prop diff", propchange);
         if ((difference.includes('data') || difference.includes('value')) && !difference.includes('errorMsg')) {
-            console.log("not updating", difference);
-            return false;
+            return false || propchange;
         }
-        console.log("updating", difference);
         return true;
     }
-    getAddress(ensName) {
+    getAddress() {
         return __awaiter(this, void 0, void 0, function* () {
-            const { web3, registryContract } = this.props;
-            if (web3.utils.isAddress(ensName)) {
+            const { web3, ensName, ensHash, isAddress, registryContract } = this.props;
+            if (isAddress) {
                 return ensName;
             }
-            const ensHash = namehash.hash(ensName);
             const exists = yield registryContract.methods.recordExists(ensHash).call();
             const owner = yield registryContract.methods.owner(ensHash).call();
             const resolverAddr = yield registryContract.methods.resolver(ensHash).call();
@@ -60,12 +63,11 @@ class ENSSend extends React.Component {
     }
     onTransferClick() {
         return __awaiter(this, void 0, void 0, function* () {
-            const { web3, ensName } = this.props;
             const { data, value } = this.state;
             let acc;
             console.log(value, data);
             try {
-                acc = yield this.getAddress(ensName);
+                acc = yield this.getAddress();
             }
             catch (e) {
                 this.setState({
@@ -73,6 +75,7 @@ class ENSSend extends React.Component {
                 });
                 return;
             }
+            const { web3 } = this.props;
             try {
                 const accounts = yield web3.eth.getAccounts();
                 yield web3.eth.sendTransaction({

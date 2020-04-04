@@ -11,9 +11,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const React = require("react");
 const Web3 = require('web3');
+const namehash = require('eth-ens-namehash');
 const ENSCheck_1 = require("./ENSCheck");
 const ENSSend_1 = require("./ENSSend");
+const ENSBasics_1 = require("./ENSBasics");
 const Settings_1 = require("../Settings");
+const utils_1 = require("../utils");
 const Ens_1 = require("../abi/Ens");
 class AppContainer extends React.Component {
     constructor(props) {
@@ -24,7 +27,10 @@ class AppContainer extends React.Component {
             controllerContract: null,
             baseContract: null,
             chainID: null,
-            ensName: null
+            ensName: null,
+            ensHash: null,
+            tokenID: null,
+            isAddress: false
         };
         this.onNameChange = this.onNameChange.bind(this);
     }
@@ -54,20 +60,31 @@ class AppContainer extends React.Component {
             //await this.fillWithFirstENSName();
         });
     }
-    fillWithFirstENSName() {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.setState({ ensName: 'alice.ewc' });
+    onNameChange(ensName) {
+        console.log("name changed");
+        const { web3 } = this.state;
+        const ensHash = namehash.hash(ensName);
+        const namefragments = ensName.split('.');
+        const tokenID = web3.utils.hexToNumberString(web3.utils.soliditySha3(namefragments.length > 1 ? namefragments.slice(0, -1).join('.') : ensName));
+        const isAddress = web3.utils.isAddress(ensName);
+        this.setState({
+            ensName,
+            ensHash,
+            tokenID,
+            isAddress
         });
     }
-    onNameChange(event) {
+    onTyping(event, f) {
         return __awaiter(this, void 0, void 0, function* () {
             event.persist();
-            this.setState({ ensName: event.target.value });
+            console.log("ontyping", event.target.value);
+            f(event.target.value);
         });
     }
     render() {
-        const { chainID } = this.state;
+        const { chainID, isAddress, registryContract, baseContract, controllerContract, ensName, ensHash, tokenID, web3 } = this.state;
         const isValidNetwork = Object.keys(Settings_1.NETWORKS).includes(chainID === null || chainID === void 0 ? void 0 : chainID.toString());
+        const f = utils_1.debounce(this.onNameChange, 500);
         return React.createElement("div", { className: 'container' },
             React.createElement("h1", { className: 'text-center text-muted space' }, "ENS name resource checker"),
             isValidNetwork &&
@@ -82,9 +99,10 @@ class AppContainer extends React.Component {
                         React.createElement("div", { className: 'col-md-4' },
                             React.createElement("h2", { className: 'card-title text-right' }, "Your input")),
                         React.createElement("div", { className: 'col-md-8' },
-                            React.createElement("input", { type: 'text', className: 'form-control text-center', placeholder: 'type ENS name to look up, e.g. alice.ewc', onChange: this.onNameChange, defaultValue: this.state.ensName }))),
-                    React.createElement(ENSSend_1.ENSSend, { web3: this.state.web3, registryContract: this.state.registryContract, ensName: this.state.ensName }),
-                    React.createElement(ENSCheck_1.ENSCheck, { web3: this.state.web3, registryContract: this.state.registryContract, baseContract: this.state.baseContract, controllerContract: this.state.controllerContract, ensName: this.state.ensName })),
+                            React.createElement("input", { type: 'text', className: 'form-control text-center', placeholder: 'type ENS name to look up, e.g. alice.ewc', onChange: (e) => this.onTyping(e, f), defaultValue: ensName }))),
+                    React.createElement(ENSSend_1.ENSSend, { web3: web3, registryContract: registryContract, ensName: ensName, ensHash: ensHash, isAddress: isAddress }),
+                    React.createElement(ENSBasics_1.ENSBasics, { ensName: ensName, ensHash: ensHash, tokenID: tokenID, isAddress: isAddress }),
+                    React.createElement(ENSCheck_1.ENSCheck, { web3: web3, registryContract: registryContract, baseContract: baseContract, controllerContract: controllerContract, ensName: ensName, ensHash: ensHash, tokenID: tokenID, isAddress: isAddress })),
             !isValidNetwork &&
                 React.createElement("div", { className: 'alert alert-warning space', role: 'alert' },
                     React.createElement("strong", null, "You are not connected to Energy Web Chain or Volta test network."),

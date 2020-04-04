@@ -1,6 +1,5 @@
 import * as React from 'react';
 import Web3 = require('web3');
-const namehash = require('eth-ens-namehash');
 
 import {RESOLVER_PUBLIC_ABI} from '../abi/Ens'
 
@@ -11,7 +10,9 @@ import {
 interface ENSSendProps {
     web3: any
     registryContract: any
-    ensName: string
+    ensName: string,
+    ensHash: string,
+    isAddress: boolean
 }
 
 interface ENSSendState {
@@ -32,27 +33,31 @@ export class ENSSend extends React.Component<ENSSendProps, ENSSendState> {
     }
 
     componentDidUpdate(prevProps: ENSSendProps) {
+        if (this.props.ensName !== prevProps.ensName) {
+            this.setState({errorMsg: null})
+        }
     }
 
     async componentDidMount() {
+        console.log("send didmount")
     }
 
     shouldComponentUpdate(nextProps: ENSSendProps, nextState: ENSSendState) {
         const difference = Object.keys(nextState).filter(k => nextState[k] !== this.state[k]);
+        console.log("state diff", difference)
+        const propchange = this.props.ensName !== nextProps.ensName
+        console.log("prop diff", propchange)
         if((difference.includes('data') || difference.includes('value')) && !difference.includes('errorMsg')) {
-            console.log("not updating", difference)
-            return false
+            return false || propchange
         }
-        console.log("updating", difference)
         return true
     }
 
-    async getAddress(ensName: string) {
-        const { web3, registryContract } = this.props;
-        if(web3.utils.isAddress(ensName)) {
+    async getAddress() {
+        const { web3, ensName, ensHash, isAddress, registryContract } = this.props;
+        if(isAddress) {
             return ensName
         }
-        const ensHash = namehash.hash(ensName)
         const exists = await registryContract.methods.recordExists(ensHash).call()
         const owner = await registryContract.methods.owner(ensHash).call()
         const resolverAddr = await registryContract.methods.resolver(ensHash).call()
@@ -66,18 +71,18 @@ export class ENSSend extends React.Component<ENSSendProps, ENSSendState> {
     }
 
     async onTransferClick() {
-        const { web3, ensName } = this.props;
         const { data, value } = this.state;
         let acc
         console.log(value, data)
         try {
-            acc = await this.getAddress(ensName)
+            acc = await this.getAddress()
         } catch (e) {
             this.setState({
                 errorMsg: e
             })
             return
         }
+        const { web3 } = this.props;
         try {
             const accounts = await web3.eth.getAccounts();
             await web3.eth.sendTransaction({
